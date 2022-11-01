@@ -1,0 +1,25 @@
+indexing-settings:
+  sites:
+    - url: https://nikoartgallery.com
+      name: Креативное пространство и галерея Н.Б. Никогосяна
+    - url: https://www.svetlovka.ru
+      name: ЦГМБ им. М. А. Светлова
+server:
+  port: 8080
+spring:
+  datasource:
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    url: ${DB_URL}
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+jsoup:
+  user-agent: Tesla1402SearchBot
+  referrer: http://www.google.com
+  timeout-min: 50
+  timeout-max: 150
