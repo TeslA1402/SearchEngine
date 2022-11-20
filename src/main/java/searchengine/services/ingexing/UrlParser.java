@@ -1,5 +1,6 @@
 package searchengine.services.ingexing;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -22,6 +23,7 @@ import java.util.concurrent.RecursiveAction;
 import java.util.stream.Collectors;
 
 @Log4j2
+@RequiredArgsConstructor
 public class UrlParser extends RecursiveAction {
     private final Site site;
     private final String path;
@@ -32,28 +34,6 @@ public class UrlParser extends RecursiveAction {
     private final JsoupConfig jsoupConfig;
     private final boolean isFirstAction;
     private static final Random random = new Random();
-
-    public UrlParser(Site site, String path, PageRepository pageRepository, SiteRepository siteRepository, IndexRepository indexRepository, LemmaRepository lemmaRepository, JsoupConfig jsoupConfig, boolean isFirstAction) {
-        this.site = site;
-        this.path = path.trim().isBlank() ? "/" : path.trim();
-        this.pageRepository = pageRepository;
-        this.siteRepository = siteRepository;
-        this.indexRepository = indexRepository;
-        this.lemmaRepository = lemmaRepository;
-        this.jsoupConfig = jsoupConfig;
-        this.isFirstAction = isFirstAction;
-    }
-
-    public UrlParser(Site site, PageRepository pageRepository, SiteRepository siteRepository, IndexRepository indexRepository, LemmaRepository lemmaRepository, JsoupConfig jsoupConfig, boolean isFirstAction) {
-        this.site = site;
-        this.path = "/";
-        this.pageRepository = pageRepository;
-        this.siteRepository = siteRepository;
-        this.indexRepository = indexRepository;
-        this.lemmaRepository = lemmaRepository;
-        this.jsoupConfig = jsoupConfig;
-        this.isFirstAction = isFirstAction;
-    }
 
     @Override
     protected void compute() {
@@ -67,7 +47,9 @@ public class UrlParser extends RecursiveAction {
 
                 Page page = savePage(response.statusCode(), document.html());
 
+                System.out.println(Thread.currentThread().getName() + " start");
                 findLemmas(page);
+                System.out.println(Thread.currentThread().getName() + " finish");
 
                 Set<String> paths = getPaths(document);
                 paths.forEach(path -> {

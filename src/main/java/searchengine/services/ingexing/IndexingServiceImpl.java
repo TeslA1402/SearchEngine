@@ -7,6 +7,7 @@ import searchengine.config.JsoupConfig;
 import searchengine.config.SitesList;
 import searchengine.dto.indexing.IndexingRequest;
 import searchengine.dto.indexing.IndexingResponse;
+import searchengine.model.Page;
 import searchengine.model.Site;
 import searchengine.model.SiteStatus;
 import searchengine.repository.IndexRepository;
@@ -49,17 +50,21 @@ public class IndexingServiceImpl implements IndexingService {
                     .statusTime(LocalDateTime.now())
                     .build());
 
-            new UrlParser(persistSite, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
+            new UrlParser(persistSite, "/", pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
         });
 
         return new IndexingResponse(true, null);
     }
 
     private void deleteSite(String url) {
-        indexRepository.deleteByPageSiteUrlIgnoreCase(url);
-        lemmaRepository.deleteBySiteUrlIgnoreCase(url);
-        pageRepository.deleteBySiteUrlIgnoreCase(url);
-        siteRepository.deleteByUrlIgnoreCase(url);
+        Optional<Site> optional = siteRepository.findByUrlIgnoreCase(url);
+        optional.ifPresent(site -> {
+            indexRepository.deleteByPageSite(site);
+            lemmaRepository.deleteBySite(site);
+            pageRepository.deleteBySite(site);
+            siteRepository.delete(site);
+        });
+
     }
 
     @Override
@@ -80,7 +85,7 @@ public class IndexingServiceImpl implements IndexingService {
     @Override
     public IndexingResponse indexPage(IndexingRequest indexingRequest) {
         String siteUrl = "";
-        String path = "";
+        String path = "/";
         try {
             URL url = new URL(indexingRequest.url());
             siteUrl = url.getProtocol() + "://" + url.getHost();
@@ -88,30 +93,38 @@ public class IndexingServiceImpl implements IndexingService {
         } catch (MalformedURLException ignore) {
         }
 
+        path = path.trim();
+        path = path.isBlank() ? "/" : path;
+
         Optional<Site> optional = siteRepository.findByUrlIgnoreCase(siteUrl);
 
         if (optional.isPresent()) {
-            deletePage(siteUrl);
-            new UrlParser(optional.get(), path, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
+            Site site = optional.get();
+            deletePage(site, path);
+            new UrlParser(site, path, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
             return new IndexingResponse(true, null);
         } else {
             return new IndexingResponse(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         }
     }
 
-    public void deletePage(String siteUrl) {
-        indexRepository.deleteByPageSiteUrlIgnoreCase(siteUrl);
-        lemmaRepository.findAllBySiteUrlIgnoreCase(siteUrl).forEach(lemma -> {
-            int countIndex = indexRepository.countByPageSiteUrlIgnoreCase(siteUrl);
-            if (countIndex == 0) {
-                lemmaRepository.delete(lemma);
-            } else {
-                lemma.setFrequency(countIndex);
-                lemmaRepository.save(lemma);
-            }
-        });
-        pageRepository.deleteBySiteUrlIgnoreCase(siteUrl);
+    private void deletePage(Site site, String path) {
+        Optional<Page> optional = pageRepository.findBySiteAndPath(site, path);
 
+        if (optional.isPresent()) {
+            Page page = optional.get();
+            indexRepository.deleteByPage(page);
+            lemmaRepository.findAllBySite(page.getSite()).forEach(lemma -> {
+                int countByLemma = indexRepository.countByLemma(lemma);
+                if (countByLemma == 0) {
+                    lemmaRepository.delete(lemma);
+                } else {
+                    lemma.setFrequency(countByLemma);
+                    lemmaRepository.save(lemma);
+                }
+            });
+            pageRepository.delete(page);
+        }
     }
 
 

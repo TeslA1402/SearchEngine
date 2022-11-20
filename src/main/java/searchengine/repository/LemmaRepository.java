@@ -12,7 +12,9 @@ public interface LemmaRepository extends CrudRepository<Lemma, Integer> {
     Optional<Lemma> findBySiteAndLemma(Site site, String lemma);
 
     @Transactional
-    void deleteBySiteUrlIgnoreCase(String url);
+    void deleteBySite(Site site);
 
-    Set<Lemma> findAllBySiteUrlIgnoreCase(String url);
+    Set<Lemma> findAllBySite(Site site);
+
+    int countBySite(Site site);
 }

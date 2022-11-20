@@ -9,7 +9,9 @@ import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 @RequiredArgsConstructor
 public class LemmaFinder {
@@ -21,6 +23,8 @@ public class LemmaFinder {
         String content = page.getContent();
         String text = htmlToText(content);
         Map<String, Long> lemmas = parser.parse(text);
+        Set<Lemma> lemmaSet = new HashSet<>();
+        Set<Index> indices = new HashSet<>();
         lemmas.forEach((name, count) -> {
             Lemma lemma = lemmaRepository.findBySiteAndLemma(page.getSite(), name).orElseGet(() -> Lemma.builder()
                     .frequency(0)
@@ -28,15 +32,16 @@ public class LemmaFinder {
                     .site(page.getSite())
                     .build());
             lemma.incrementFrequency();
-            Lemma persistLemma = lemmaRepository.save(lemma);
-            Index index = Index.builder()
-                    .page(page)
-                    .lemma(persistLemma)
-                    .rank((float) count)
-                    .build();
-            indexRepository.save(index);
-        });
+            lemmaSet.add(lemma);
 
+            indices.add(Index.builder()
+                    .page(page)
+                    .lemma(lemma)
+                    .rank((float) count)
+                    .build());
+        });
+        lemmaRepository.saveAll(lemmaSet);
+        indexRepository.saveAll(indices);
     }
 
     private String htmlToText(String html) {

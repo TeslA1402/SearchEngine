@@ -44,7 +44,7 @@ public class ApiController {
     }
 
     private ResponseEntity<IndexingResponse> responseEntity(IndexingResponse response) {
-        if (response.isResult()) {
+        if (response.result()) {
             return ResponseEntity.ok(response);
         } else {
             return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
