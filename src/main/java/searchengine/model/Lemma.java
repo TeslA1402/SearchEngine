@@ -12,8 +12,8 @@ import java.util.Objects;
 @AllArgsConstructor(access = AccessLevel.PACKAGE)
 @NoArgsConstructor
 @Entity
-@Table(name = "page", indexes = @javax.persistence.Index(columnList = "path"), uniqueConstraints = @UniqueConstraint(columnNames = {"site_id", "path"}))
-public class Page {
+@Table(name = "lemma", uniqueConstraints = @UniqueConstraint(columnNames = {"site_id", "lemma"}))
+public class Lemma {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(columnDefinition = "INT")
@@ -24,24 +24,25 @@ public class Page {
     private Site site;
 
     @Column(nullable = false, columnDefinition = "VARCHAR(255)")
-    private String path;
+    private String lemma;
 
     @Column(nullable = false, columnDefinition = "INT")
-    private Integer code;
+    private Integer frequency;
 
-    @Column(nullable = false, columnDefinition = "MEDIUMTEXT")
-    private String content;
+    public void incrementFrequency() {
+        frequency += 1;
+    }
 
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
-        Page page = (Page) o;
-        return Objects.equals(site, page.site) && Objects.equals(path, page.path);
+        Lemma lemma1 = (Lemma) o;
+        return Objects.equals(site, lemma1.site) && Objects.equals(lemma, lemma1.lemma);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(site, path);
+        return Objects.hash(site, lemma);
     }
 }

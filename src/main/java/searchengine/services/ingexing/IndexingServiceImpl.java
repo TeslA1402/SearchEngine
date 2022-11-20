@@ -5,13 +5,19 @@ import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import searchengine.config.JsoupConfig;
 import searchengine.config.SitesList;
+import searchengine.dto.indexing.IndexingRequest;
 import searchengine.dto.indexing.IndexingResponse;
 import searchengine.model.Site;
 import searchengine.model.SiteStatus;
+import searchengine.repository.IndexRepository;
+import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +26,8 @@ public class IndexingServiceImpl implements IndexingService {
     private final SitesList sitesList;
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
+    private final IndexRepository indexRepository;
+    private final LemmaRepository lemmaRepository;
     private final JsoupConfig jsoupConfig;
 
 
@@ -30,21 +38,28 @@ public class IndexingServiceImpl implements IndexingService {
         }
 
         sitesList.getSites().forEach(site -> {
-                    String url = site.getUrl();
-                    pageRepository.deleteBySiteUrlIgnoreCase(url);
-                    siteRepository.deleteByUrlIgnoreCase(url);
-                }
-        );
+            String url = site.getUrl();
 
-        sitesList.getSites().forEach(site -> siteRepository.save(Site.builder()
-                .name(site.getName())
-                .status(SiteStatus.INDEXING)
-                .url(site.getUrl().toLowerCase())
-                .statusTime(LocalDateTime.now())
-                .build()));
+            deleteSite(url);
 
-        siteRepository.findAll().forEach(site -> new UrlParser(site, "/", pageRepository, siteRepository, jsoupConfig, true).fork());
+            Site persistSite = siteRepository.save(Site.builder()
+                    .name(site.getName())
+                    .status(SiteStatus.INDEXING)
+                    .url(url.toLowerCase())
+                    .statusTime(LocalDateTime.now())
+                    .build());
+
+            new UrlParser(persistSite, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
+        });
+
         return new IndexingResponse(true, null);
+    }
+
+    private void deleteSite(String url) {
+        indexRepository.deleteByPageSiteUrlIgnoreCase(url);
+        lemmaRepository.deleteBySiteUrlIgnoreCase(url);
+        pageRepository.deleteBySiteUrlIgnoreCase(url);
+        siteRepository.deleteByUrlIgnoreCase(url);
     }
 
     @Override
@@ -61,6 +76,44 @@ public class IndexingServiceImpl implements IndexingService {
 
         return new IndexingResponse(true, null);
     }
+
+    @Override
+    public IndexingResponse indexPage(IndexingRequest indexingRequest) {
+        String siteUrl = "";
+        String path = "";
+        try {
+            URL url = new URL(indexingRequest.url());
+            siteUrl = url.getProtocol() + "://" + url.getHost();
+            path = url.getPath();
+        } catch (MalformedURLException ignore) {
+        }
+
+        Optional<Site> optional = siteRepository.findByUrlIgnoreCase(siteUrl);
+
+        if (optional.isPresent()) {
+            deletePage(siteUrl);
+            new UrlParser(optional.get(), path, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
+            return new IndexingResponse(true, null);
+        } else {
+            return new IndexingResponse(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
+        }
+    }
+
+    public void deletePage(String siteUrl) {
+        indexRepository.deleteByPageSiteUrlIgnoreCase(siteUrl);
+        lemmaRepository.findAllBySiteUrlIgnoreCase(siteUrl).forEach(lemma -> {
+            int countIndex = indexRepository.countByPageSiteUrlIgnoreCase(siteUrl);
+            if (countIndex == 0) {
+                lemmaRepository.delete(lemma);
+            } else {
+                lemma.setFrequency(countIndex);
+                lemmaRepository.save(lemma);
+            }
+        });
+        pageRepository.deleteBySiteUrlIgnoreCase(siteUrl);
+
+    }
+
 
     private boolean isIndexing() {
         return siteRepository.existsByStatus(SiteStatus.INDEXING);

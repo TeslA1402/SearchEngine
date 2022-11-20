@@ -33,7 +33,7 @@ public class Site {
     @Column(nullable = false, unique = true, columnDefinition = "VARCHAR(255)")
     private String url;
 
-    @Column(nullable = false, unique = true, columnDefinition = "VARCHAR(255)")
+    @Column(nullable = false, columnDefinition = "VARCHAR(255)")
     private String name;
 
     @Override

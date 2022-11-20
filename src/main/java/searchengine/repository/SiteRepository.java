@@ -5,6 +5,7 @@ import org.springframework.transaction.annotation.Transactional;
 import searchengine.model.Site;
 import searchengine.model.SiteStatus;
 
+import java.util.Optional;
 import java.util.Set;
 
 public interface SiteRepository extends CrudRepository<Site, Integer> {
@@ -16,4 +17,6 @@ public interface SiteRepository extends CrudRepository<Site, Integer> {
     boolean existsByStatus(SiteStatus status);
 
     boolean existsByIdAndStatus(Integer id, SiteStatus status);
+
+    Optional<Site> findByUrlIgnoreCase(String url);
 }
