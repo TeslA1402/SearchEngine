@@ -3,7 +3,9 @@ package searchengine.model;
 import lombok.*;
 
 import javax.persistence.*;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -28,6 +30,11 @@ public class Lemma {
 
     @Column(nullable = false, columnDefinition = "INT")
     private Integer frequency;
+
+    @OneToMany(mappedBy = "lemma", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @ToString.Exclude
+    private Set<Index> indices = new HashSet<>();
 
     public void incrementFrequency() {
         frequency += 1;

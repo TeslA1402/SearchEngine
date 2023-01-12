@@ -3,7 +3,9 @@ package searchengine.model;
 import lombok.*;
 
 import javax.persistence.*;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 
 @Getter
 @Setter
@@ -31,6 +33,11 @@ public class Page {
 
     @Column(nullable = false, columnDefinition = "MEDIUMTEXT")
     private String content;
+
+    @OneToMany(mappedBy = "page", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    @ToString.Exclude
+    private Set<Index> indices = new HashSet<>();
 
     @Override
     public boolean equals(Object o) {

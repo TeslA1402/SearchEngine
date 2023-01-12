@@ -25,23 +25,27 @@ public class LemmaFinder {
         Map<String, Long> lemmas = parser.parse(text);
         Set<Lemma> lemmaSet = new HashSet<>();
         Set<Index> indices = new HashSet<>();
-        lemmas.forEach((name, count) -> {
-            Lemma lemma = lemmaRepository.findBySiteAndLemma(page.getSite(), name).orElseGet(() -> Lemma.builder()
-                    .frequency(0)
-                    .lemma(name)
-                    .site(page.getSite())
-                    .build());
-            lemma.incrementFrequency();
-            lemmaSet.add(lemma);
+        synchronized (lemmaRepository){
+            synchronized (indexRepository){
+                lemmas.forEach((name, count) -> {
+                    Lemma lemma = lemmaRepository.findBySiteAndLemma(page.getSite(), name).orElseGet(() -> Lemma.builder()
+                            .frequency(0)
+                            .lemma(name)
+                            .site(page.getSite())
+                            .build());
+                    lemma.incrementFrequency();
+                    lemmaSet.add(lemma);
 
-            indices.add(Index.builder()
-                    .page(page)
-                    .lemma(lemma)
-                    .rank((float) count)
-                    .build());
-        });
-        lemmaRepository.saveAll(lemmaSet);
-        indexRepository.saveAll(indices);
+                    indices.add(Index.builder()
+                            .page(page)
+                            .lemma(lemma)
+                            .rank((float) count)
+                            .build());
+                });
+                lemmaRepository.saveAll(lemmaSet);
+                indexRepository.saveAll(indices);
+            }
+        }
     }
 
     private String htmlToText(String html) {

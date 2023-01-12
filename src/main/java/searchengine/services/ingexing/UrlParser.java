@@ -1,7 +1,6 @@
 package searchengine.services.ingexing;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.log4j.Log4j2;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.UnsupportedMimeTypeException;
@@ -17,12 +16,13 @@ import searchengine.repository.SiteRepository;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
 import java.util.stream.Collectors;
 
-@Log4j2
 @RequiredArgsConstructor
 public class UrlParser extends RecursiveAction {
     private final Site site;
@@ -37,7 +37,7 @@ public class UrlParser extends RecursiveAction {
 
     @Override
     protected void compute() {
-        if (isNotFailed()) {
+        if (isNotFailed() && !isVisited()) {
             try {
                 Thread.sleep(jsoupConfig.getTimeoutMin() + Math.abs(random.nextInt()) % jsoupConfig.getTimeoutMax() - jsoupConfig.getTimeoutMin());
                 updateStatusTime();
@@ -45,21 +45,17 @@ public class UrlParser extends RecursiveAction {
                 Connection.Response response = getResponse();
                 Document document = response.parse();
 
-                Page page = savePage(response.statusCode(), document.html());
+                Optional<Page> optionalPage = savePage(response.statusCode(), document.html());
 
-                System.out.println(Thread.currentThread().getName() + " start");
-                findLemmas(page);
-                System.out.println(Thread.currentThread().getName() + " finish");
+                if (optionalPage.isPresent()) {
+                    findLemmas(optionalPage.get());
 
-                Set<String> paths = getPaths(document);
-                paths.forEach(path -> {
-                    if (!isVisited(path)) {
-                        new UrlParser(site, path, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, false).invoke();
+                    Set<ForkJoinTask<Void>> tasks = getPaths(document).stream().map(path -> new UrlParser(site, path, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, false).fork()).collect(Collectors.toSet());
+                    tasks.forEach(ForkJoinTask::join);
+
+                    if (isFirstAction && isNotFailed()) {
+                        indexed();
                     }
-                });
-
-                if (isFirstAction && isNotFailed()) {
-                    indexed();
                 }
             } catch (UnsupportedMimeTypeException ignored) {
             } catch (Exception ignored) {
@@ -95,13 +91,21 @@ public class UrlParser extends RecursiveAction {
                 .execute();
     }
 
-    private Page savePage(int code, String content) {
-        return pageRepository.save(Page.builder()
-                .path(path)
-                .site(site)
-                .code(code)
-                .content(content)
-                .build());
+    private synchronized Optional<Page> savePage(int code, String content) {
+        if (!isVisited()) {
+            return Optional.of(pageRepository.save(Page.builder()
+                    .path(path)
+                    .site(site)
+                    .code(code)
+                    .content(content)
+                    .build()));
+        } else {
+            return Optional.empty();
+        }
+    }
+
+    private boolean isVisited() {
+        return pageRepository.existsBySiteAndPath(site, path);
     }
 
     private void updateStatusTime() {
@@ -118,10 +122,6 @@ public class UrlParser extends RecursiveAction {
 
     private Site getPersistSite() {
         return siteRepository.findById(site.getId()).orElseThrow(() -> new IllegalStateException("Site not found"));
-    }
-
-    private boolean isVisited(String path) {
-        return pageRepository.existsBySiteAndPath(site, path);
     }
 
     private boolean isNotFailed() {

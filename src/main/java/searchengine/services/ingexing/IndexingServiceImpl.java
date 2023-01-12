@@ -38,33 +38,29 @@ public class IndexingServiceImpl implements IndexingService {
             return new IndexingResponse(false, "Индексация уже запущена");
         }
 
-        sitesList.getSites().forEach(site -> {
+        for (searchengine.config.Site site : sitesList.getSites()) {
             String url = site.getUrl();
 
             deleteSite(url);
 
-            Site persistSite = siteRepository.save(Site.builder()
+            siteRepository.save(Site.builder()
                     .name(site.getName())
                     .status(SiteStatus.INDEXING)
                     .url(url.toLowerCase())
                     .statusTime(LocalDateTime.now())
                     .build());
+        }
 
-            new UrlParser(persistSite, "/", pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
-        });
+        for (Site site : siteRepository.findAll()) {
+            new UrlParser(site, "/", pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
+        }
 
         return new IndexingResponse(true, null);
     }
 
     private void deleteSite(String url) {
         Optional<Site> optional = siteRepository.findByUrlIgnoreCase(url);
-        optional.ifPresent(site -> {
-            indexRepository.deleteByPageSite(site);
-            lemmaRepository.deleteBySite(site);
-            pageRepository.deleteBySite(site);
-            siteRepository.delete(site);
-        });
-
+        optional.ifPresent(siteRepository::delete);
     }
 
     @Override
@@ -110,12 +106,11 @@ public class IndexingServiceImpl implements IndexingService {
 
     private void deletePage(Site site, String path) {
         Optional<Page> optional = pageRepository.findBySiteAndPath(site, path);
-
         if (optional.isPresent()) {
             Page page = optional.get();
-            indexRepository.deleteByPage(page);
+            page.getIndices().clear();
             lemmaRepository.findAllBySite(page.getSite()).forEach(lemma -> {
-                int countByLemma = indexRepository.countByLemma(lemma);
+                int countByLemma = indexRepository.countByLemmaAndPageSite(lemma, site);
                 if (countByLemma == 0) {
                     lemmaRepository.delete(lemma);
                 } else {
