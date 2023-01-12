@@ -34,7 +34,7 @@ public class Page {
     @Column(nullable = false, columnDefinition = "MEDIUMTEXT")
     private String content;
 
-    @OneToMany(mappedBy = "page", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "page", cascade = CascadeType.ALL)
     @Builder.Default
     @ToString.Exclude
     private Set<Index> indices = new HashSet<>();

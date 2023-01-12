@@ -6,6 +6,7 @@ import org.jsoup.Jsoup;
 import org.jsoup.UnsupportedMimeTypeException;
 import org.jsoup.nodes.Document;
 import searchengine.config.JsoupConfig;
+import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.model.Site;
 import searchengine.model.SiteStatus;
@@ -16,6 +17,7 @@ import searchengine.repository.SiteRepository;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Random;
 import java.util.Set;
@@ -54,6 +56,7 @@ public class UrlParser extends RecursiveAction {
                     tasks.forEach(ForkJoinTask::join);
 
                     if (isFirstAction && isNotFailed()) {
+                        setLemmaFrequency();
                         indexed();
                     }
                 }
@@ -62,6 +65,23 @@ public class UrlParser extends RecursiveAction {
                 failed("Ошибка парсинга URL: " + site.getUrl() + path);
             }
         }
+    }
+
+    private void setLemmaFrequency() {
+        Set<Lemma> lemmaToSave = new HashSet<>();
+        Set<Lemma> lemmaToDelete = new HashSet<>();
+        for (Lemma lemma : lemmaRepository.findAllBySite(site)) {
+            int frequency = indexRepository.countByLemmaAndPageSite(lemma, site);
+            lemma.setFrequency(frequency);
+            if (frequency == 0) {
+                lemmaToDelete.add(lemma);
+            } else {
+                lemma.setFrequency(frequency);
+                lemmaToSave.add(lemma);
+            }
+        }
+        lemmaRepository.deleteAll(lemmaToDelete);
+        lemmaRepository.saveAll(lemmaToSave);
     }
 
     private void findLemmas(Page page) {
@@ -91,16 +111,18 @@ public class UrlParser extends RecursiveAction {
                 .execute();
     }
 
-    private synchronized Optional<Page> savePage(int code, String content) {
-        if (!isVisited()) {
-            return Optional.of(pageRepository.save(Page.builder()
-                    .path(path)
-                    .site(site)
-                    .code(code)
-                    .content(content)
-                    .build()));
-        } else {
-            return Optional.empty();
+    private Optional<Page> savePage(int code, String content) {
+        synchronized (pageRepository) {
+            if (!isVisited()) {
+                return Optional.of(pageRepository.save(Page.builder()
+                        .path(path)
+                        .site(site)
+                        .code(code)
+                        .content(content)
+                        .build()));
+            } else {
+                return Optional.empty();
+            }
         }
     }
 
@@ -116,6 +138,7 @@ public class UrlParser extends RecursiveAction {
 
     private void indexed() {
         Site persistSite = getPersistSite();
+        persistSite.setStatusTime(LocalDateTime.now());
         persistSite.setStatus(SiteStatus.INDEXED);
         siteRepository.save(persistSite);
     }

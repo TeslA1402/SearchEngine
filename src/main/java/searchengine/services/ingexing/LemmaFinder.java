@@ -11,6 +11,7 @@ import searchengine.repository.LemmaRepository;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 @RequiredArgsConstructor
@@ -23,29 +24,32 @@ public class LemmaFinder {
         String content = page.getContent();
         String text = htmlToText(content);
         Map<String, Long> lemmas = parser.parse(text);
-        Set<Lemma> lemmaSet = new HashSet<>();
+        Set<Lemma> lemmaSetToSave = new HashSet<>();
         Set<Index> indices = new HashSet<>();
-        synchronized (lemmaRepository){
-            synchronized (indexRepository){
-                lemmas.forEach((name, count) -> {
-                    Lemma lemma = lemmaRepository.findBySiteAndLemma(page.getSite(), name).orElseGet(() -> Lemma.builder()
+        synchronized (lemmaRepository) {
+            lemmas.forEach((name, count) -> {
+                Optional<Lemma> optionalLemma = lemmaRepository.findBySiteAndLemma(page.getSite(), name);
+                Lemma lemma;
+                if (optionalLemma.isPresent()) {
+                    lemma = optionalLemma.get();
+                } else {
+                    lemma = Lemma.builder()
                             .frequency(0)
                             .lemma(name)
                             .site(page.getSite())
-                            .build());
-                    lemma.incrementFrequency();
-                    lemmaSet.add(lemma);
+                            .build();
+                    lemmaSetToSave.add(lemma);
+                }
 
-                    indices.add(Index.builder()
-                            .page(page)
-                            .lemma(lemma)
-                            .rank((float) count)
-                            .build());
-                });
-                lemmaRepository.saveAll(lemmaSet);
-                indexRepository.saveAll(indices);
-            }
+                indices.add(Index.builder()
+                        .page(page)
+                        .lemma(lemma)
+                        .rank((float) count)
+                        .build());
+            });
+            lemmaRepository.saveAll(lemmaSetToSave);
         }
+        indexRepository.saveAll(indices);
     }
 
     private String htmlToText(String html) {

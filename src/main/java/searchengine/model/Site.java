@@ -38,12 +38,12 @@ public class Site {
     @Column(nullable = false, columnDefinition = "VARCHAR(255)")
     private String name;
 
-    @OneToMany(mappedBy = "site", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "site", cascade = CascadeType.ALL)
     @Builder.Default
     @ToString.Exclude
     private Set<Page> pages = new HashSet<>();
 
-    @OneToMany(mappedBy = "site", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "site", cascade = CascadeType.ALL)
     @Builder.Default
     @ToString.Exclude
     private Set<Lemma> lemmas = new HashSet<>();

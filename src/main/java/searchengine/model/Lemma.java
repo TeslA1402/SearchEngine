@@ -31,15 +31,10 @@ public class Lemma {
     @Column(nullable = false, columnDefinition = "INT")
     private Integer frequency;
 
-    @OneToMany(mappedBy = "lemma", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "lemma", cascade = CascadeType.ALL)
     @Builder.Default
     @ToString.Exclude
     private Set<Index> indices = new HashSet<>();
-
-    public void incrementFrequency() {
-        frequency += 1;
-    }
-
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
