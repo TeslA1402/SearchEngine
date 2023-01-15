@@ -1,6 +1,7 @@
 package searchengine.services.statistics;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import searchengine.dto.statistics.DetailedStatisticsItem;
 import searchengine.dto.statistics.StatisticsData;
@@ -18,6 +19,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class StatisticsServiceImpl implements StatisticsService {
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
@@ -25,6 +27,7 @@ public class StatisticsServiceImpl implements StatisticsService {
 
     @Override
     public StatisticsResponse getStatistics() {
+        log.info("Get statistics");
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
         for (Site site : siteRepository.findAll()) {
             DetailedStatisticsItem detailedStatisticsItem = new DetailedStatisticsItem();

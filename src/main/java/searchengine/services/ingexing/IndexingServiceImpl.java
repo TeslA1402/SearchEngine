@@ -1,6 +1,7 @@
 package searchengine.services.ingexing;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import searchengine.config.JsoupConfig;
@@ -23,6 +24,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Component
+@Slf4j
 public class IndexingServiceImpl implements IndexingService {
     private final SitesList sitesList;
     private final SiteRepository siteRepository;
@@ -34,7 +36,9 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public IndexingResponse startIndexing() {
+        log.info("Start indexing");
         if (isIndexing()) {
+            log.warn("Indexing already start");
             return new IndexingResponse(false, "Индексация уже запущена");
         }
 
@@ -43,6 +47,7 @@ public class IndexingServiceImpl implements IndexingService {
         for (searchengine.config.Site site : sitesList.getSites()) {
             String url = site.getUrl();
 
+            log.info("Save site with url: {}", url);
             siteRepository.save(Site.builder()
                     .name(site.getName())
                     .status(SiteStatus.INDEXING)
@@ -52,6 +57,7 @@ public class IndexingServiceImpl implements IndexingService {
         }
 
         for (Site site : siteRepository.findAll()) {
+            log.info("Start indexing site: {}", site);
             new UrlParser(site, "/", pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
         }
 
@@ -59,6 +65,7 @@ public class IndexingServiceImpl implements IndexingService {
     }
 
     private void deleteSites() {
+        log.info("Delete all sites");
         indexRepository.deleteAll();
         lemmaRepository.deleteAll();
         pageRepository.deleteAll();
@@ -67,7 +74,9 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public IndexingResponse stopIndexing() {
+        log.info("Stop indexing");
         if (!isIndexing()) {
+            log.warn("Indexing not run");
             return new IndexingResponse(false, "Индексация не запущена");
         }
 
@@ -82,13 +91,16 @@ public class IndexingServiceImpl implements IndexingService {
 
     @Override
     public IndexingResponse indexPage(IndexingRequest indexingRequest) {
+        String requestUrl = indexingRequest.url();
+        log.info("Index page: {}", requestUrl);
         String siteUrl = "";
         String path = "/";
         try {
-            URL url = new URL(indexingRequest.url());
+            URL url = new URL(requestUrl);
             siteUrl = url.getProtocol() + "://" + url.getHost();
             path = url.getPath();
-        } catch (MalformedURLException ignore) {
+        } catch (MalformedURLException e) {
+            log.error("URL parser error", e);
         }
 
         path = path.trim();
@@ -99,6 +111,7 @@ public class IndexingServiceImpl implements IndexingService {
         if (optional.isPresent()) {
             Site site = optional.get();
             if (!site.getStatus().equals(SiteStatus.INDEXED)) {
+                log.warn("Site in not INDEXED status");
                 return new IndexingResponse(false, "Сайт не прошёл индексацию");
             }
             setIndexingStatus(site);
@@ -106,16 +119,19 @@ public class IndexingServiceImpl implements IndexingService {
             new UrlParser(site, path, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
             return new IndexingResponse(true, null);
         } else {
+            log.warn("Site not found: {}", siteUrl);
             return new IndexingResponse(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         }
     }
 
     private void setIndexingStatus(Site site) {
+        log.info("Set INDEXING status for site {}", site);
         site.setStatus(SiteStatus.INDEXING);
         siteRepository.save(site);
     }
 
     private void deletePage(Site site, String path) {
+        log.info("Delete page {} for site {}", path, site);
         Optional<Page> optional = pageRepository.findBySiteAndPath(site, path);
         optional.ifPresent(pageRepository::delete);
     }

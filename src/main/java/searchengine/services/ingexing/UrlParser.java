@@ -1,6 +1,7 @@
 package searchengine.services.ingexing;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.UnsupportedMimeTypeException;
@@ -26,6 +27,7 @@ import java.util.concurrent.RecursiveAction;
 import java.util.stream.Collectors;
 
 @RequiredArgsConstructor
+@Slf4j
 public class UrlParser extends RecursiveAction {
     private final Site site;
     private final String path;
@@ -60,8 +62,10 @@ public class UrlParser extends RecursiveAction {
                         indexed();
                     }
                 }
-            } catch (UnsupportedMimeTypeException ignored) {
-            } catch (Exception ignored) {
+            } catch (UnsupportedMimeTypeException e) {
+                log.warn("Parser exception", e);
+            } catch (Exception e) {
+                log.error("Parser exception", e);
                 failed("Ошибка парсинга URL: " + site.getUrl() + path);
             }
         }
@@ -70,17 +74,19 @@ public class UrlParser extends RecursiveAction {
     private void setLemmaFrequency() {
         Set<Lemma> lemmaToSave = new HashSet<>();
         Set<Lemma> lemmaToDelete = new HashSet<>();
+        log.info("Start calculate lemmas frequency for site: {}", site);
         for (Lemma lemma : lemmaRepository.findAllBySite(site)) {
             int frequency = indexRepository.countByLemmaAndPageSite(lemma, site);
-            lemma.setFrequency(frequency);
             if (frequency == 0) {
                 lemmaToDelete.add(lemma);
-            } else {
+            } else if (lemma.getFrequency() != frequency) {
                 lemma.setFrequency(frequency);
                 lemmaToSave.add(lemma);
             }
         }
+        log.info("Delete old lemmas: " + lemmaToDelete.size());
         lemmaRepository.deleteAll(lemmaToDelete);
+        log.info("Update lemmas: " + lemmaToSave.size());
         lemmaRepository.saveAll(lemmaToSave);
     }
 
@@ -90,6 +96,7 @@ public class UrlParser extends RecursiveAction {
                 new LemmaFinder(lemmaRepository, indexRepository).find(page);
             }
         } catch (Exception e) {
+            log.error("Lemma finder exception", e);
             failed("Ошибка индексации URL: " + site.getUrl() + path);
         }
     }
@@ -137,6 +144,7 @@ public class UrlParser extends RecursiveAction {
     }
 
     private void indexed() {
+        log.info("Site indexed: {}", site);
         Site persistSite = getPersistSite();
         persistSite.setStatusTime(LocalDateTime.now());
         persistSite.setStatus(SiteStatus.INDEXED);
