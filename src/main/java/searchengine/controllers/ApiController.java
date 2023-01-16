@@ -3,13 +3,14 @@ package searchengine.controllers;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import searchengine.dto.indexing.IndexingRequest;
 import searchengine.dto.indexing.IndexingResponse;
+import searchengine.dto.search.SearchResponse;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.ingexing.IndexingService;
+import searchengine.services.search.SearchService;
 import searchengine.services.statistics.StatisticsService;
 
 import javax.validation.Valid;
@@ -22,32 +23,37 @@ public class ApiController {
 
     private final StatisticsService statisticsService;
     private final IndexingService indexingService;
+    private final SearchService searchService;
 
     @GetMapping("/statistics")
-    public ResponseEntity<StatisticsResponse> statistics() {
-        return ResponseEntity.ok(statisticsService.getStatistics());
+    @ResponseStatus(HttpStatus.OK)
+    public StatisticsResponse statistics() {
+        return statisticsService.getStatistics();
     }
 
     @GetMapping("/startIndexing")
-    public ResponseEntity<IndexingResponse> startIndexing() {
-        return responseEntity(indexingService.startIndexing());
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public IndexingResponse startIndexing() {
+        return indexingService.startIndexing();
     }
 
     @GetMapping("/stopIndexing")
-    public ResponseEntity<IndexingResponse> stopIndexing() {
-        return responseEntity(indexingService.stopIndexing());
+    @ResponseStatus(HttpStatus.OK)
+    public IndexingResponse stopIndexing() {
+        return indexingService.stopIndexing();
     }
 
     @PostMapping(value = "/indexPage", consumes = {MediaType.APPLICATION_FORM_URLENCODED_VALUE})
-    public ResponseEntity<IndexingResponse> indexPage(@Valid IndexingRequest indexingRequest) {
-        return responseEntity(indexingService.indexPage(indexingRequest));
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public IndexingResponse indexPage(@Valid IndexingRequest indexingRequest) {
+        return indexingService.indexPage(indexingRequest);
     }
 
-    private ResponseEntity<IndexingResponse> responseEntity(IndexingResponse response) {
-        if (response.result()) {
-            return ResponseEntity.ok(response);
-        } else {
-            return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
-        }
+    @GetMapping(value = "/search")
+    @ResponseStatus(HttpStatus.OK)
+    public SearchResponse search(@RequestParam String query, @RequestParam(required = false) String site,
+                                 @RequestParam(required = false, defaultValue = "0") Long offset,
+                                 @RequestParam(required = false, defaultValue = "20") Long limit) {
+        return searchService.search(query, site, offset, limit);
     }
 }

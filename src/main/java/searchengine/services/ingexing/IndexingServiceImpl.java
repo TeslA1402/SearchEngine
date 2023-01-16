@@ -8,6 +8,8 @@ import searchengine.config.JsoupConfig;
 import searchengine.config.SitesList;
 import searchengine.dto.indexing.IndexingRequest;
 import searchengine.dto.indexing.IndexingResponse;
+import searchengine.exception.BadRequestException;
+import searchengine.exception.NotFoundException;
 import searchengine.model.Page;
 import searchengine.model.Site;
 import searchengine.model.SiteStatus;
@@ -39,7 +41,7 @@ public class IndexingServiceImpl implements IndexingService {
         log.info("Start indexing");
         if (isIndexing()) {
             log.warn("Indexing already start");
-            return new IndexingResponse(false, "Индексация уже запущена");
+            throw new BadRequestException("Индексация уже запущена");
         }
 
         deleteSites();
@@ -61,7 +63,7 @@ public class IndexingServiceImpl implements IndexingService {
             new UrlParser(site, "/", pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
         }
 
-        return new IndexingResponse(true, null);
+        return new IndexingResponse();
     }
 
     private void deleteSites() {
@@ -77,7 +79,7 @@ public class IndexingServiceImpl implements IndexingService {
         log.info("Stop indexing");
         if (!isIndexing()) {
             log.warn("Indexing not run");
-            return new IndexingResponse(false, "Индексация не запущена");
+            throw new BadRequestException("Индексация не запущена");
         }
 
         siteRepository.findAllByStatus(SiteStatus.INDEXING).forEach(site -> {
@@ -86,7 +88,7 @@ public class IndexingServiceImpl implements IndexingService {
             siteRepository.save(site);
         });
 
-        return new IndexingResponse(true, null);
+        return new IndexingResponse();
     }
 
     @Override
@@ -112,15 +114,15 @@ public class IndexingServiceImpl implements IndexingService {
             Site site = optional.get();
             if (!site.getStatus().equals(SiteStatus.INDEXED)) {
                 log.warn("Site in not INDEXED status");
-                return new IndexingResponse(false, "Сайт не прошёл индексацию");
+                throw new BadRequestException("Сайт не прошёл индексацию");
             }
             setIndexingStatus(site);
             deletePage(site, path);
             new UrlParser(site, path, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
-            return new IndexingResponse(true, null);
+            return new IndexingResponse();
         } else {
             log.warn("Site not found: {}", siteUrl);
-            return new IndexingResponse(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
+            throw new NotFoundException("Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         }
     }
 

@@ -12,5 +12,5 @@ public interface LemmaRepository extends CrudRepository<Lemma, Integer> {
 
     Set<Lemma> findAllBySite(Site site);
 
-    int countBySite(Site site);
+    long countBySite(Site site);
 }

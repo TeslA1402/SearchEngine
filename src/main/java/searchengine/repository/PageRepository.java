@@ -9,7 +9,7 @@ import java.util.Optional;
 public interface PageRepository extends CrudRepository<Page, Integer> {
     boolean existsBySiteAndPath(Site site, String path);
 
-    int countBySite(Site site);
+    long countBySite(Site site);
 
     Optional<Page> findBySiteAndPath(Site site, String path);
 }

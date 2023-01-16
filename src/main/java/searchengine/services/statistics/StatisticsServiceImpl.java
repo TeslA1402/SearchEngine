@@ -30,31 +30,19 @@ public class StatisticsServiceImpl implements StatisticsService {
         log.info("Get statistics");
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
         for (Site site : siteRepository.findAll()) {
-            DetailedStatisticsItem detailedStatisticsItem = new DetailedStatisticsItem();
-            detailedStatisticsItem.setStatus(site.getStatus().name());
-            detailedStatisticsItem.setUrl(site.getUrl());
-            detailedStatisticsItem.setName(site.getName());
-            detailedStatisticsItem.setError(site.getLastError());
-            detailedStatisticsItem.setStatusTime(site.getStatusTime().toInstant(OffsetDateTime.now().getOffset()).toEpochMilli());
-            detailedStatisticsItem.setLemmas(lemmaRepository.countBySite(site));
-            detailedStatisticsItem.setPages(pageRepository.countBySite(site));
+            DetailedStatisticsItem detailedStatisticsItem = new DetailedStatisticsItem(site.getUrl(), site.getName(),
+                    site.getStatus().name(), site.getStatusTime().toInstant(OffsetDateTime.now().getOffset()).toEpochMilli(),
+                    site.getLastError(), (int) pageRepository.countBySite(site), (int) lemmaRepository.countBySite(site));
             detailed.add(detailedStatisticsItem);
         }
 
-        TotalStatistics total = new TotalStatistics();
-        total.setIndexing(!siteRepository.existsByStatusNot(SiteStatus.INDEXED));
-        total.setSites((int) siteRepository.count());
-        total.setLemmas((int) lemmaRepository.count());
-        total.setPages((int) pageRepository.count());
+        TotalStatistics total = new TotalStatistics((int) siteRepository.count(),
+                (int) pageRepository.count(),
+                (int) lemmaRepository.count(),
+                !siteRepository.existsByStatusNot(SiteStatus.INDEXED));
 
-        StatisticsData statistics = new StatisticsData();
-        statistics.setDetailed(detailed);
-        statistics.setTotal(total);
+        StatisticsData statistics = new StatisticsData(total, detailed);
 
-        StatisticsResponse statisticsResponse = new StatisticsResponse();
-        statisticsResponse.setResult(true);
-        statisticsResponse.setStatistics(statistics);
-
-        return statisticsResponse;
+        return new StatisticsResponse(statistics);
     }
 }
