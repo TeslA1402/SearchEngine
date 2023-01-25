@@ -17,4 +17,6 @@ public interface SiteRepository extends CrudRepository<Site, Integer> {
     Optional<Site> findByUrlIgnoreCase(String url);
 
     boolean existsByStatusNot(SiteStatus status);
+
+    Set<Site> findAll();
 }

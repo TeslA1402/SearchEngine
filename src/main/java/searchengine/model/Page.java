@@ -32,6 +32,7 @@ public class Page {
     private Integer code;
 
     @Column(nullable = false, columnDefinition = "MEDIUMTEXT")
+    @ToString.Exclude
     private String content;
 
     @OneToMany(mappedBy = "page", cascade = CascadeType.ALL)

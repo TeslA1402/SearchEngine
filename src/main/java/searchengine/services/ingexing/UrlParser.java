@@ -76,7 +76,7 @@ public class UrlParser extends RecursiveAction {
         Set<Lemma> lemmaToDelete = new HashSet<>();
         log.info("Start calculate lemmas frequency for site: {}", site);
         for (Lemma lemma : lemmaRepository.findAllBySite(site)) {
-            int frequency = indexRepository.countByLemmaAndPageSite(lemma, site);
+            int frequency = indexRepository.countByLemma(lemma);
             if (frequency == 0) {
                 lemmaToDelete.add(lemma);
             } else if (lemma.getFrequency() != frequency) {
