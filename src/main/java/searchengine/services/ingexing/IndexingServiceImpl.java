@@ -4,23 +4,20 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
-import searchengine.config.JsoupConfig;
 import searchengine.config.SitesList;
 import searchengine.dto.indexing.IndexingRequest;
 import searchengine.dto.indexing.IndexingResponse;
 import searchengine.exception.BadRequestException;
 import searchengine.exception.NotFoundException;
-import searchengine.model.Page;
 import searchengine.model.Site;
 import searchengine.model.SiteStatus;
-import searchengine.repository.IndexRepository;
-import searchengine.repository.LemmaRepository;
-import searchengine.repository.PageRepository;
-import searchengine.repository.SiteRepository;
+import searchengine.services.index.IndexService;
+import searchengine.services.lemma.LemmaService;
+import searchengine.services.page.PageService;
+import searchengine.services.site.SiteService;
 
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -29,17 +26,16 @@ import java.util.Optional;
 @Slf4j
 public class IndexingServiceImpl implements IndexingService {
     private final SitesList sitesList;
-    private final SiteRepository siteRepository;
-    private final PageRepository pageRepository;
-    private final IndexRepository indexRepository;
-    private final LemmaRepository lemmaRepository;
-    private final JsoupConfig jsoupConfig;
+    private final SiteService siteService;
+    private final LemmaService lemmaService;
+    private final PageService pageService;
+    private final IndexService indexService;
 
 
     @Override
     public IndexingResponse startIndexing() {
         log.info("Start indexing");
-        if (isIndexing()) {
+        if (siteService.existsIndexingSite()) {
             log.warn("Indexing already start");
             throw new BadRequestException("Индексация уже запущена");
         }
@@ -48,45 +44,34 @@ public class IndexingServiceImpl implements IndexingService {
 
         for (searchengine.config.Site site : sitesList.getSites()) {
             String url = site.getUrl();
-
             log.info("Save site with url: {}", url);
-            siteRepository.save(Site.builder()
-                    .name(site.getName())
-                    .status(SiteStatus.INDEXING)
-                    .url(url.toLowerCase())
-                    .statusTime(LocalDateTime.now())
-                    .build());
+            siteService.save(site.getName(), url);
         }
 
-        for (Site site : siteRepository.findAll()) {
+        for (Site site : siteService.findAll()) {
             log.info("Start indexing site: {}", site);
-            new UrlParser(site, "/", pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
+            new UrlParser(site, "/", siteService, pageService, lemmaService, true).fork();
         }
-
         return new IndexingResponse();
     }
 
     private void deleteSites() {
         log.info("Delete all sites");
-        indexRepository.deleteAll();
-        lemmaRepository.deleteAll();
-        pageRepository.deleteAll();
-        siteRepository.deleteAll();
+        indexService.deleteAll();
+        lemmaService.deleteAll();
+        pageService.deleteAll();
+        siteService.deleteAll();
     }
 
     @Override
     public IndexingResponse stopIndexing() {
         log.info("Stop indexing");
-        if (!isIndexing()) {
+        if (!siteService.existsIndexingSite()) {
             log.warn("Indexing not run");
             throw new BadRequestException("Индексация не запущена");
         }
 
-        siteRepository.findAllByStatus(SiteStatus.INDEXING).forEach(site -> {
-            site.setLastError("Индексация остановлена пользователем");
-            site.setStatus(SiteStatus.FAILED);
-            siteRepository.save(site);
-        });
+        siteService.stopIndexingAllSites();
 
         return new IndexingResponse();
     }
@@ -108,7 +93,7 @@ public class IndexingServiceImpl implements IndexingService {
         path = path.trim();
         path = path.isBlank() ? "/" : path;
 
-        Optional<Site> optional = siteRepository.findByUrlIgnoreCase(siteUrl);
+        Optional<Site> optional = siteService.findByUrlIgnoreCase(siteUrl);
 
         if (optional.isPresent()) {
             Site site = optional.get();
@@ -116,30 +101,13 @@ public class IndexingServiceImpl implements IndexingService {
                 log.warn("Site in not INDEXED status");
                 throw new BadRequestException("Сайт не прошёл индексацию");
             }
-            setIndexingStatus(site);
-            deletePage(site, path);
-            new UrlParser(site, path, pageRepository, siteRepository, indexRepository, lemmaRepository, jsoupConfig, true).fork();
+            siteService.indexing(site.getId());
+            pageService.deletePage(site, path);
+            new UrlParser(site, path, siteService, pageService, lemmaService, true).fork();
             return new IndexingResponse();
         } else {
             log.warn("Site not found: {}", siteUrl);
             throw new NotFoundException("Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
         }
-    }
-
-    private void setIndexingStatus(Site site) {
-        log.info("Set INDEXING status for site {}", site);
-        site.setStatus(SiteStatus.INDEXING);
-        siteRepository.save(site);
-    }
-
-    private void deletePage(Site site, String path) {
-        log.info("Delete page {} for site {}", path, site);
-        Optional<Page> optional = pageRepository.findBySiteAndPath(site, path);
-        optional.ifPresent(pageRepository::delete);
-    }
-
-
-    private boolean isIndexing() {
-        return siteRepository.existsByStatus(SiteStatus.INDEXING);
     }
 }

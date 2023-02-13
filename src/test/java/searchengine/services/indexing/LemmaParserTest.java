@@ -2,14 +2,14 @@ package searchengine.services.indexing;
 
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
-import searchengine.services.ingexing.LemmaParser;
+import searchengine.services.lemma.LemmaParser;
 
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
-public class LemmaParserTest {
+class LemmaParserTest {
 
     @SneakyThrows
     @Test
@@ -29,8 +29,8 @@ public class LemmaParserTest {
             put("обитать", 1L);
         }};
 
-        LemmaParser lemmaFinder = LemmaParser.getInstance();
-        Map<String, Long> lemmas = lemmaFinder.parse("Повторное появление леопарда в Осетии позволяет предположить, что леопард постоянно обитает в некоторых районах Северного Кавказа.");
+        LemmaParser lemmaFinder = new LemmaParser();
+        Map<String, Long> lemmas = lemmaFinder.parseToLemmaWithCount("Повторное появление леопарда в Осетии позволяет предположить, что леопард постоянно обитает в некоторых районах Северного Кавказа.");
 
         assertEquals(expected, lemmas);
     }

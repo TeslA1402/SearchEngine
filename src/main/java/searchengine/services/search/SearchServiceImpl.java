@@ -1,7 +1,6 @@
 package searchengine.services.search;
 
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import searchengine.dto.search.SearchData;
@@ -9,9 +8,10 @@ import searchengine.dto.search.SearchResponse;
 import searchengine.exception.BadRequestException;
 import searchengine.exception.NotFoundException;
 import searchengine.model.*;
-import searchengine.repository.LemmaRepository;
-import searchengine.repository.SiteRepository;
-import searchengine.services.ingexing.LemmaParser;
+import searchengine.services.lemma.LemmaParser;
+import searchengine.services.lemma.LemmaService;
+import searchengine.services.page.PageService;
+import searchengine.services.site.SiteService;
 
 import java.util.*;
 import java.util.function.Function;
@@ -21,8 +21,10 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class SearchServiceImpl implements SearchService {
-    private final LemmaRepository lemmaRepository;
-    private final SiteRepository siteRepository;
+    private final LemmaService lemmaService;
+    private final PageService pageService;
+    private final SiteService siteService;
+    private final LemmaParser lemmaParser;
 
     @Override
     public SearchResponse search(String query, String site, Integer offset, Integer limit) {
@@ -31,14 +33,14 @@ public class SearchServiceImpl implements SearchService {
         if (query == null || query.isBlank()) {
             throw new BadRequestException("Задан пустой поисковый запрос");
         }
-        Set<Site> sites = getSites(site);
-        Set<String> queryLemmas = findLemmas(query).keySet();
+        List<Site> sites = getSites(site);
+        Set<String> queryLemmas = lemmaParser.parseToLemmaWithCount(query.trim()).keySet();
 
         Map<Page, Double> pageRank = new HashMap<>();
 
         for (Site persistSite : sites) {
             List<Lemma> sortedLemmas = queryLemmas.stream()
-                    .map(lemma -> lemmaRepository.findBySiteAndLemma(persistSite, lemma))
+                    .map(lemma -> lemmaService.findBySiteAndLemma(persistSite, lemma))
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .sorted(Comparator.comparing(Lemma::getFrequency))
@@ -57,8 +59,7 @@ public class SearchServiceImpl implements SearchService {
         } else {
             double maxRank = optionalMaxRank.get();
             searchData = pageRank.entrySet().stream()
-                    //TODO реализовать получение title и snippet
-                    .map(entry -> new SearchData(entry.getKey(), "А тута титл", "А тута снипет", (float) (entry.getValue() / maxRank)))
+                    .map(entry -> new SearchData(entry.getKey(), pageService.getTitle(entry.getKey()), pageService.generateSnippet(query, entry.getKey()), (float) (entry.getValue() / maxRank)))
                     .sorted((a, b) -> Float.compare(b.relevance(), a.relevance()))
                     .toList();
         }
@@ -80,12 +81,6 @@ public class SearchServiceImpl implements SearchService {
         return searchData.subList(fromIndex, toIndex);
     }
 
-    @SneakyThrows
-    private Map<String, Long> findLemmas(String query) {
-        LemmaParser parser = LemmaParser.getInstance();
-        return parser.parse(query.trim());
-    }
-
     private double sumRank(Page page, Set<Lemma> lemmas) {
         return page.getIndices().stream()
                 .filter(index -> lemmas.contains(index.getLemma()))
@@ -101,15 +96,15 @@ public class SearchServiceImpl implements SearchService {
         return pages;
     }
 
-    private Set<Site> getSites(String site) {
-        Set<Site> sites;
+    private List<Site> getSites(String site) {
+        List<Site> sites;
         if (site == null || site.isBlank()) {
-            sites = siteRepository.findAll();
+            sites = siteService.findAll();
         } else {
             String trimSite = site.trim();
             if (trimSite.matches("^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\b$")) {
-                Site persistSite = siteRepository.findByUrlIgnoreCase(trimSite).orElseThrow(() -> new NotFoundException("Сайт не найден"));
-                sites = Set.of(persistSite);
+                Site persistSite = siteService.findByUrlIgnoreCase(trimSite).orElseThrow(() -> new NotFoundException("Сайт не найден"));
+                sites = List.of(persistSite);
             } else {
                 throw new BadRequestException("Некорректный адрес сайта");
             }
@@ -118,7 +113,7 @@ public class SearchServiceImpl implements SearchService {
         return sites;
     }
 
-    private void checkIndexed(Set<Site> sites) {
+    private void checkIndexed(List<Site> sites) {
         boolean existsIndexedSite = sites.stream().anyMatch(site -> site.getStatus().equals(SiteStatus.INDEXED));
         if (!existsIndexedSite) {
             throw new BadRequestException("Сайт не проиндексирован");
