@@ -8,18 +8,18 @@ server:
   port: 8080
 spring:
   datasource:
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-    url: ${DB_URL}
+    url: jdbc:h2:mem:mydb
+    username: sa
+    password: password
   jpa:
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.MySQL8Dialect
+        dialect: org.hibernate.dialect.H2Dialect
     hibernate:
-      ddl-auto: update
+      ddl-auto: create-drop
     show-sql: false
 jsoup:
   user-agent: Tesla1402SearchBot
   referrer: http://www.google.com
-  timeout-min: 50 # нижняя граница задержки между вызовом jsoup парсера в миллисекундах
-  timeout-max: 150 # верхняя граница задержки между вызовом jsoup парсера в миллисекундах
+  timeout-min: 50
+  timeout-max: 150

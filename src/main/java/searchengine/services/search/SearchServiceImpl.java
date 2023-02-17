@@ -45,6 +45,7 @@ public class SearchServiceImpl implements SearchService {
                     .map(Optional::get)
                     .sorted(Comparator.comparing(Lemma::getFrequency))
                     .toList();
+
             Set<Lemma> lemmaSet = new HashSet<>(sortedLemmas);
 
             Set<Page> pages = getPages(sortedLemmas);
@@ -114,8 +115,8 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private void checkIndexed(List<Site> sites) {
-        boolean existsIndexedSite = sites.stream().anyMatch(site -> site.getStatus().equals(SiteStatus.INDEXED));
-        if (!existsIndexedSite) {
+        boolean allSitesIndexed = sites.stream().allMatch(site -> site.getStatus().equals(SiteStatus.INDEXED));
+        if (!allSitesIndexed) {
             throw new BadRequestException("Сайт не проиндексирован");
         }
     }
