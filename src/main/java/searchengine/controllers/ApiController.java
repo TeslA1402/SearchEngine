@@ -32,7 +32,7 @@ public class ApiController {
     }
 
     @GetMapping("/startIndexing")
-    @ResponseStatus(HttpStatus.OK)
+    @ResponseStatus(HttpStatus.ACCEPTED)
     public IndexingResponse startIndexing() {
         return indexingService.startIndexing();
     }
@@ -44,7 +44,7 @@ public class ApiController {
     }
 
     @PostMapping(value = "/indexPage", consumes = {MediaType.APPLICATION_FORM_URLENCODED_VALUE})
-    @ResponseStatus(HttpStatus.OK)
+    @ResponseStatus(HttpStatus.ACCEPTED)
     public IndexingResponse indexPage(@Valid IndexingRequest indexingRequest) {
         return indexingService.indexPage(indexingRequest);
     }
