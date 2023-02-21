@@ -1,8 +1,9 @@
-package searchengine.services.lemma;
+package searchengine.utils;
 
 import org.apache.lucene.morphology.LuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.springframework.stereotype.Component;
+import searchengine.services.lemma.WordLemmas;
 
 import java.io.IOException;
 import java.util.*;

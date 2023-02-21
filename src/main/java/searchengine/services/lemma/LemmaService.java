@@ -3,14 +3,15 @@ package searchengine.services.lemma;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import searchengine.model.Index;
 import searchengine.model.Lemma;
 import searchengine.model.Page;
 import searchengine.model.Site;
+import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
-import searchengine.services.index.IndexService;
-import searchengine.services.page.PageService;
+import searchengine.repository.SiteRepository;
+import searchengine.utils.HtmlParser;
+import searchengine.utils.LemmaParser;
 
 import java.util.HashSet;
 import java.util.Map;
@@ -21,14 +22,14 @@ import java.util.Set;
 @RequiredArgsConstructor
 @Slf4j
 public class LemmaService {
+    private final IndexRepository indexRepository;
     private final LemmaRepository lemmaRepository;
+    private final SiteRepository siteRepository;
     private final LemmaParser lemmaParser;
-    private final IndexService indexService;
-
-    private final PageService pageService;
+    private final HtmlParser pageService;
 
     public void findAndSave(Page page) {
-        String text = pageService.htmlToText(page);
+        String text = pageService.htmlToText(page.getContent());
         Map<String, Long> lemmas = lemmaParser.parseToLemmaWithCount(text);
         Set<Lemma> lemmaSetToSave = new HashSet<>();
         Set<Index> indices = new HashSet<>();
@@ -55,15 +56,16 @@ public class LemmaService {
             });
             lemmaRepository.saveAll(lemmaSetToSave);
         }
-        indexService.saveAll(indices);
+        indexRepository.saveAll(indices);
     }
 
-    public void updateLemmasFrequency(Site site) {
+    public void updateLemmasFrequency(Integer siteId) {
+        Site site = siteRepository.findById(siteId).orElseThrow(() -> new IllegalStateException("Site not found"));
         Set<Lemma> lemmaToSave = new HashSet<>();
         Set<Lemma> lemmaToDelete = new HashSet<>();
         log.info("Start calculate lemmas frequency for site: {}", site);
         for (Lemma lemma : lemmaRepository.findAllBySite(site)) {
-            int frequency = indexService.countByLemma(lemma);
+            int frequency = indexRepository.countByLemma(lemma);
             if (frequency == 0) {
                 lemmaToDelete.add(lemma);
             } else if (lemma.getFrequency() != frequency) {
@@ -75,14 +77,5 @@ public class LemmaService {
         lemmaRepository.deleteAll(lemmaToDelete);
         log.info("Update lemmas: " + lemmaToSave.size());
         lemmaRepository.saveAll(lemmaToSave);
-    }
-
-    @Transactional
-    public void deleteAll() {
-        lemmaRepository.deleteAllInBatch();
-    }
-
-    public Optional<Lemma> findBySiteAndLemma(Site s, String lemma) {
-        return lemmaRepository.findBySiteAndLemma(s, lemma);
     }
 }

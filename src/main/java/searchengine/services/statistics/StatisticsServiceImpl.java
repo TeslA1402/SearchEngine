@@ -31,8 +31,10 @@ public class StatisticsServiceImpl implements StatisticsService {
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
         for (Site site : siteRepository.findAll()) {
             DetailedStatisticsItem detailedStatisticsItem = new DetailedStatisticsItem(site.getUrl(), site.getName(),
-                    site.getStatus().name(), site.getStatusTime().toInstant(OffsetDateTime.now().getOffset()).toEpochMilli(),
-                    site.getLastError(), (int) pageRepository.countBySite(site), (int) lemmaRepository.countBySite(site));
+                    site.getStatus().name(),
+                    site.getStatusTime().toInstant(OffsetDateTime.now().getOffset()).toEpochMilli(),
+                    site.getLastError(), (int) pageRepository.countBySite(site),
+                    (int) lemmaRepository.countBySite(site));
             detailed.add(detailedStatisticsItem);
         }
 

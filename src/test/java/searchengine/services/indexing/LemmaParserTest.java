@@ -2,7 +2,7 @@ package searchengine.services.indexing;
 
 import lombok.SneakyThrows;
 import org.junit.jupiter.api.Test;
-import searchengine.services.lemma.LemmaParser;
+import searchengine.utils.LemmaParser;
 
 import java.util.HashMap;
 import java.util.Map;

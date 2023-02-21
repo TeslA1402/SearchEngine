@@ -14,7 +14,8 @@ import java.util.Set;
 @AllArgsConstructor(access = AccessLevel.PACKAGE)
 @NoArgsConstructor
 @Entity
-@Table(name = "page", indexes = @javax.persistence.Index(columnList = "path"), uniqueConstraints = @UniqueConstraint(columnNames = {"site_id", "path"}))
+@Table(name = "page", indexes = @javax.persistence.Index(columnList = "path"),
+        uniqueConstraints = @UniqueConstraint(columnNames = {"site_id", "path"}))
 public class Page {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

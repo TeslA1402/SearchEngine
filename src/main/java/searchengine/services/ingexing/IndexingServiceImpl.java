@@ -9,15 +9,19 @@ import searchengine.dto.indexing.IndexingRequest;
 import searchengine.dto.indexing.IndexingResponse;
 import searchengine.exception.BadRequestException;
 import searchengine.exception.NotFoundException;
+import searchengine.model.Page;
 import searchengine.model.Site;
 import searchengine.model.SiteStatus;
-import searchengine.services.index.IndexService;
+import searchengine.repository.IndexRepository;
+import searchengine.repository.LemmaRepository;
+import searchengine.repository.PageRepository;
+import searchengine.repository.SiteRepository;
 import searchengine.services.lemma.LemmaService;
-import searchengine.services.page.PageService;
-import searchengine.services.site.SiteService;
+import searchengine.utils.HtmlParser;
 
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -25,17 +29,19 @@ import java.util.Optional;
 @Component
 @Slf4j
 public class IndexingServiceImpl implements IndexingService {
+    private final PageRepository pageRepository;
+    private final SiteRepository siteRepository;
+    private final LemmaRepository lemmaRepository;
+    private final IndexRepository indexRepository;
     private final SitesList sitesList;
-    private final SiteService siteService;
     private final LemmaService lemmaService;
-    private final PageService pageService;
-    private final IndexService indexService;
+    private final HtmlParser htmlParser;
 
 
     @Override
     public IndexingResponse startIndexing() {
         log.info("Start indexing");
-        if (siteService.existsIndexingSite()) {
+        if (existsIndexingSite()) {
             log.warn("Indexing already start");
             throw new BadRequestException("Индексация уже запущена");
         }
@@ -45,33 +51,42 @@ public class IndexingServiceImpl implements IndexingService {
         for (searchengine.config.Site site : sitesList.getSites()) {
             String url = site.getUrl();
             log.info("Save site with url: {}", url);
-            siteService.save(site.getName(), url);
+            siteRepository.save(Site.builder()
+                    .name(site.getName())
+                    .status(SiteStatus.INDEXING)
+                    .url(url.toLowerCase())
+                    .statusTime(LocalDateTime.now())
+                    .build());
         }
 
-        for (Site site : siteService.findAll()) {
+        for (Site site : siteRepository.findAll()) {
             log.info("Start indexing site: {}", site);
-            new UrlParser(site, "/", siteService, pageService, lemmaService, true).fork();
+            runParser(site.getId(), "/");
         }
         return new IndexingResponse();
     }
 
     private void deleteSites() {
         log.info("Delete all sites");
-        indexService.deleteAll();
-        lemmaService.deleteAll();
-        pageService.deleteAll();
-        siteService.deleteAll();
+        indexRepository.deleteAllInBatch();
+        lemmaRepository.deleteAllInBatch();
+        pageRepository.deleteAllInBatch();
+        siteRepository.deleteAllInBatch();
     }
 
     @Override
     public IndexingResponse stopIndexing() {
         log.info("Stop indexing");
-        if (!siteService.existsIndexingSite()) {
+        if (!existsIndexingSite()) {
             log.warn("Indexing not run");
             throw new BadRequestException("Индексация не запущена");
         }
 
-        siteService.stopIndexingAllSites();
+        siteRepository.findAllByStatus(SiteStatus.INDEXING).forEach(site -> {
+            site.setLastError("Индексация остановлена пользователем");
+            site.setStatus(SiteStatus.FAILED);
+            siteRepository.save(site);
+        });
 
         return new IndexingResponse();
     }
@@ -93,7 +108,7 @@ public class IndexingServiceImpl implements IndexingService {
         path = path.trim();
         path = path.isBlank() ? "/" : path;
 
-        Optional<Site> optional = siteService.findByUrlIgnoreCase(siteUrl);
+        Optional<Site> optional = siteRepository.findByUrlIgnoreCase(siteUrl);
 
         if (optional.isPresent()) {
             Site site = optional.get();
@@ -101,13 +116,39 @@ public class IndexingServiceImpl implements IndexingService {
                 log.warn("Site in not INDEXED status");
                 throw new BadRequestException("Сайт не прошёл индексацию");
             }
-            siteService.indexing(site.getId());
-            pageService.deletePage(site, path);
-            new UrlParser(site, path, siteService, pageService, lemmaService, true).fork();
+            indexing(site.getId());
+            deletePage(site, path);
+            runParser(site.getId(), path);
             return new IndexingResponse();
         } else {
             log.warn("Site not found: {}", siteUrl);
-            throw new NotFoundException("Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
+            throw new NotFoundException("Данная страница находится за пределами сайтов, " +
+                    "указанных в конфигурационном файле");
         }
+    }
+
+    private void runParser(Integer siteId, String path) {
+        new UrlParser(siteId, path,
+                siteRepository, pageRepository,
+                lemmaService,
+                htmlParser,
+                true).fork();
+    }
+
+    private void deletePage(Site site, String path) {
+        log.info("Delete page {} for site {}", path, site);
+        Optional<Page> optional = pageRepository.findBySiteAndPath(site, path);
+        optional.ifPresent(pageRepository::delete);
+    }
+
+    private void indexing(Integer siteId) {
+        Site site = siteRepository.findById(siteId).orElseThrow(() -> new IllegalStateException("Site not found"));
+        site.setStatus(SiteStatus.INDEXING);
+        siteRepository.save(site);
+        log.info("Site indexing: {}", site);
+    }
+
+    private boolean existsIndexingSite() {
+        return siteRepository.existsByStatus(SiteStatus.INDEXING);
     }
 }

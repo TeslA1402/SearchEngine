@@ -35,6 +35,7 @@ public class Lemma {
     @Builder.Default
     @ToString.Exclude
     private Set<Index> indices = new HashSet<>();
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

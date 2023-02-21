@@ -8,10 +8,11 @@ import searchengine.dto.search.SearchResponse;
 import searchengine.exception.BadRequestException;
 import searchengine.exception.NotFoundException;
 import searchengine.model.*;
-import searchengine.services.lemma.LemmaParser;
-import searchengine.services.lemma.LemmaService;
-import searchengine.services.page.PageService;
-import searchengine.services.site.SiteService;
+import searchengine.repository.LemmaRepository;
+import searchengine.repository.SiteRepository;
+import searchengine.utils.HtmlParser;
+import searchengine.utils.LemmaParser;
+import searchengine.utils.SnippetGenerator;
 
 import java.util.*;
 import java.util.function.Function;
@@ -21,9 +22,10 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class SearchServiceImpl implements SearchService {
-    private final LemmaService lemmaService;
-    private final PageService pageService;
-    private final SiteService siteService;
+    private final SiteRepository siteRepository;
+    private final LemmaRepository lemmaRepository;
+    private final HtmlParser htmlParser;
+    private final SnippetGenerator snippetGenerator;
     private final LemmaParser lemmaParser;
 
     @Override
@@ -40,7 +42,7 @@ public class SearchServiceImpl implements SearchService {
 
         for (Site persistSite : sites) {
             List<Lemma> sortedLemmas = queryLemmas.stream()
-                    .map(lemma -> lemmaService.findBySiteAndLemma(persistSite, lemma))
+                    .map(lemma -> lemmaRepository.findBySiteAndLemma(persistSite, lemma))
                     .filter(Optional::isPresent)
                     .map(Optional::get)
                     .sorted(Comparator.comparing(Lemma::getFrequency))
@@ -50,7 +52,8 @@ public class SearchServiceImpl implements SearchService {
 
             Set<Page> pages = getPages(sortedLemmas);
 
-            pageRank.putAll(pages.stream().collect(Collectors.toMap(Function.identity(), page -> sumRank(page, lemmaSet))));
+            pageRank.putAll(pages.stream().collect(Collectors.toMap(Function.identity(),
+                    page -> sumRank(page, lemmaSet))));
         }
 
         Optional<Double> optionalMaxRank = pageRank.values().stream().max(Double::compareTo);
@@ -60,7 +63,12 @@ public class SearchServiceImpl implements SearchService {
         } else {
             double maxRank = optionalMaxRank.get();
             searchData = pageRank.entrySet().stream()
-                    .map(entry -> new SearchData(entry.getKey(), pageService.getTitle(entry.getKey()), pageService.generateSnippet(query, entry.getKey()), (float) (entry.getValue() / maxRank)))
+                    .map(entry -> {
+                        String content = entry.getKey().getContent();
+                        return new SearchData(entry.getKey(), htmlParser.getTitle(content),
+                                snippetGenerator.generateSnippet(query, content),
+                                (float) (entry.getValue() / maxRank));
+                    })
                     .sorted((a, b) -> Float.compare(b.relevance(), a.relevance()))
                     .toList();
         }
@@ -92,7 +100,10 @@ public class SearchServiceImpl implements SearchService {
         if (sortedLemmas.isEmpty()) return Set.of();
         Set<Page> pages = sortedLemmas.get(0).getIndices().stream().map(Index::getPage).collect(Collectors.toSet());
         for (int i = 1; i < sortedLemmas.size(); i++) {
-            pages = sortedLemmas.get(i).getIndices().stream().map(Index::getPage).filter(pages::contains).collect(Collectors.toSet());
+            pages = sortedLemmas.get(i).getIndices().stream()
+                    .map(Index::getPage)
+                    .filter(pages::contains)
+                    .collect(Collectors.toSet());
         }
         return pages;
     }
@@ -100,11 +111,12 @@ public class SearchServiceImpl implements SearchService {
     private List<Site> getSites(String site) {
         List<Site> sites;
         if (site == null || site.isBlank()) {
-            sites = siteService.findAll();
+            sites = siteRepository.findAll();
         } else {
             String trimSite = site.trim();
             if (trimSite.matches("^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\b$")) {
-                Site persistSite = siteService.findByUrlIgnoreCase(trimSite).orElseThrow(() -> new NotFoundException("Сайт не найден"));
+                Site persistSite = siteRepository.findByUrlIgnoreCase(trimSite)
+                        .orElseThrow(() -> new NotFoundException("Сайт не найден"));
                 sites = List.of(persistSite);
             } else {
                 throw new BadRequestException("Некорректный адрес сайта");

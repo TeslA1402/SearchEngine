@@ -7,7 +7,7 @@ import searchengine.model.Site;
 import java.util.Optional;
 
 public interface PageRepository extends JpaRepository<Page, Integer> {
-    boolean existsBySiteAndPath(Site site, String path);
+    boolean existsBySiteIdAndPath(Integer siteId, String path);
 
     long countBySite(Site site);
 
