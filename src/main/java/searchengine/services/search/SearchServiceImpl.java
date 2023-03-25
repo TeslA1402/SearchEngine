@@ -8,6 +8,7 @@ import searchengine.dto.search.SearchResponse;
 import searchengine.exception.BadRequestException;
 import searchengine.exception.NotFoundException;
 import searchengine.model.*;
+import searchengine.repository.IndexRepository;
 import searchengine.repository.LemmaRepository;
 import searchengine.repository.SiteRepository;
 import searchengine.utils.HtmlParser;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class SearchServiceImpl implements SearchService {
+    private final IndexRepository indexRepository;
     private final SiteRepository siteRepository;
     private final LemmaRepository lemmaRepository;
     private final HtmlParser htmlParser;
@@ -62,7 +64,7 @@ public class SearchServiceImpl implements SearchService {
             searchData = List.of();
         } else {
             double maxRank = optionalMaxRank.get();
-            searchData = pageRank.entrySet().stream()
+            searchData = pageRank.entrySet().parallelStream()
                     .map(entry -> {
                         String content = entry.getKey().getContent();
                         return new SearchData(entry.getKey(), htmlParser.getTitle(content),
@@ -100,10 +102,12 @@ public class SearchServiceImpl implements SearchService {
         if (sortedLemmas.isEmpty()) return Set.of();
         Set<Page> pages = sortedLemmas.get(0).getIndices().stream().map(Index::getPage).collect(Collectors.toSet());
         for (int i = 1; i < sortedLemmas.size(); i++) {
-            pages = sortedLemmas.get(i).getIndices().stream()
+            pages = indexRepository.findAllByLemmaAndPageIn(sortedLemmas.get(i), pages).stream()
                     .map(Index::getPage)
-                    .filter(pages::contains)
                     .collect(Collectors.toSet());
+            if (pages.isEmpty()) {
+                return pages;
+            }
         }
         return pages;
     }
@@ -114,7 +118,7 @@ public class SearchServiceImpl implements SearchService {
             sites = siteRepository.findAll();
         } else {
             String trimSite = site.trim();
-            if (trimSite.matches("^https?:\\/\\/(?:www\\.)?[-a-zA-Z0-9@:%._\\+~#=]{1,256}\\b$")) {
+            if (trimSite.matches("^https?://(?:www\\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\\b$")) {
                 Site persistSite = siteRepository.findByUrlIgnoreCase(trimSite)
                         .orElseThrow(() -> new NotFoundException("Сайт не найден"));
                 sites = List.of(persistSite);
