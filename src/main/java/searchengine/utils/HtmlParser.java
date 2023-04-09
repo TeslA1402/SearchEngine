@@ -9,7 +9,14 @@ import org.springframework.stereotype.Service;
 import searchengine.config.JsoupConfig;
 import searchengine.dto.PageInfo;
 
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 import java.io.IOException;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.cert.X509Certificate;
 import java.util.Random;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -45,7 +52,30 @@ public class HtmlParser {
                 .referrer(jsoupConfig.getReferrer())
                 .header("Accept-Language", "ru")
                 .ignoreHttpErrors(true)
+                .sslSocketFactory(socketFactory())
                 .execute();
+    }
+
+    private SSLSocketFactory socketFactory() {
+        TrustManager[] trustAllCerts = new TrustManager[]{new X509TrustManager() {
+            public java.security.cert.X509Certificate[] getAcceptedIssuers() {
+                return new X509Certificate[0];
+            }
+
+            public void checkClientTrusted(X509Certificate[] certs, String authType) {
+            }
+
+            public void checkServerTrusted(X509Certificate[] certs, String authType) {
+            }
+        }};
+
+        try {
+            SSLContext sslContext = SSLContext.getInstance("SSL");
+            sslContext.init(null, trustAllCerts, new java.security.SecureRandom());
+            return sslContext.getSocketFactory();
+        } catch (NoSuchAlgorithmException | KeyManagementException e) {
+            throw new RuntimeException("Failed to create a SSL socket factory", e);
+        }
     }
 
     public String htmlToText(String content) {
