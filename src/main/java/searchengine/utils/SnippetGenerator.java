@@ -4,9 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import searchengine.services.lemma.WordLemmas;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 
 @Component
@@ -19,7 +17,7 @@ public class SnippetGenerator {
     public String generateSnippet(String query, String content) {
         List<WordLemmas> queryLemmas = lemmaParser.parseToWordWithLemmas(query);
         List<WordLemmas> wordLemmas = lemmaParser.parseToWordWithLemmas(htmlParser.htmlToText(content));
-        List<WordLemmas> pageCommonSequence = commonSequence(queryLemmas, wordLemmas);
+        List<WordLemmas> pageCommonSequence = longestCS(queryLemmas, wordLemmas);
         return paddingSnippet(content, pageCommonSequence);
     }
 
@@ -48,22 +46,28 @@ public class SnippetGenerator {
                 String.join(" ", Arrays.asList(split).subList(endIndex, rightIndex))).trim();
     }
 
-    private List<WordLemmas> commonSequence(List<WordLemmas> query, List<WordLemmas> page) {
-        List<List<WordLemmas>> buffer = new ArrayList<>();
-        for (int i = 0; i < page.size(); i++) {
-            for (int j = 0; j < query.size(); j++) {
-                if (page.get(i).equals(query.get(j))) {
-                    List<WordLemmas> list = new ArrayList<>();
-                    int k = 0;
-                    while (i + k < page.size() && j + k < query.size() && page.get(i + k).equals(query.get(j + k))) {
-                        list.add(page.get(i + k));
-                        k++;
+    private List<WordLemmas> longestCS(List<WordLemmas> query, List<WordLemmas> page) {
+        int[][] matrix = new int[query.size()][];
+
+        int maxLength = 0;
+        int maxJ = 0;
+
+        for (int i = 0; i < matrix.length; i++) {
+            matrix[i] = new int[page.size()];
+            for (int j = 0; j < matrix[i].length; j++) {
+                if (query.get(i).equals(page.get(j))) {
+                    if (i != 0 && j != 0) {
+                        matrix[i][j] = matrix[i - 1][j - 1] + 1;
+                    } else {
+                        matrix[i][j] = 1;
                     }
-                    buffer.add(list);
+                    if (matrix[i][j] > maxLength) {
+                        maxLength = matrix[i][j];
+                        maxJ = j;
+                    }
                 }
             }
         }
-        return buffer.stream().max(Comparator.comparingInt(List::size))
-                .orElseThrow(() -> new IllegalStateException("Common sequence not found"));
+        return page.subList(maxJ - maxLength + 1, maxJ + 1);
     }
 }
