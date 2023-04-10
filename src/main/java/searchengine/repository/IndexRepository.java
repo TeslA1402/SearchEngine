@@ -11,4 +11,6 @@ public interface IndexRepository extends JpaRepository<Index, Integer> {
     int countByLemma(Lemma lemma);
 
     Set<Index> findAllByLemmaAndPageIn(Lemma lemma, Set<Page> pages);
+
+    Set<Index> findAllByPageAndLemmaIn(Page page, Set<Lemma> lemmas);
 }

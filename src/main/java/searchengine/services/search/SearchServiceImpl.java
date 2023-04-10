@@ -66,10 +66,12 @@ public class SearchServiceImpl implements SearchService {
             double maxRank = optionalMaxRank.get();
             searchData = pageRank.entrySet().parallelStream()
                     .map(entry -> {
-                        String content = entry.getKey().getContent();
-                        return new SearchData(entry.getKey(), htmlParser.getTitle(content),
+                        Page page = entry.getKey();
+                        Double rank = entry.getValue();
+                        String content = page.getContent();
+                        return new SearchData(page, htmlParser.getTitle(content),
                                 snippetGenerator.generateSnippet(query, content),
-                                (float) (entry.getValue() / maxRank));
+                                (float) (rank / maxRank));
                     })
                     .sorted((a, b) -> Float.compare(b.relevance(), a.relevance()))
                     .toList();
@@ -93,9 +95,7 @@ public class SearchServiceImpl implements SearchService {
     }
 
     private double sumRank(Page page, Set<Lemma> lemmas) {
-        return page.getIndices().stream()
-                .filter(index -> lemmas.contains(index.getLemma()))
-                .mapToDouble(Index::getRank).sum();
+        return indexRepository.findAllByPageAndLemmaIn(page, lemmas).stream().mapToDouble(Index::getRank).sum();
     }
 
     private Set<Page> getPages(List<Lemma> sortedLemmas) {
