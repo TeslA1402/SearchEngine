@@ -1,7 +1,6 @@
 package searchengine.utils;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -23,7 +22,6 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class HtmlParser {
     private final JsoupConfig jsoupConfig;
     private static final Random random = new Random();
