@@ -2,7 +2,6 @@ package searchengine.services.ingexing;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import searchengine.config.SitesList;
 import searchengine.dto.indexing.IndexingRequest;
@@ -26,7 +25,6 @@ import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
-@Component
 @Slf4j
 public class IndexingServiceImpl implements IndexingService {
     private final PageRepository pageRepository;
