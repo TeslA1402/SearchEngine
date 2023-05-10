@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
 public class SearchServiceImpl implements SearchService {
+    private static final String URL_REGEX = "^https?://(?:www\\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\\b$";
     private final IndexRepository indexRepository;
     private final SiteRepository siteRepository;
     private final LemmaRepository lemmaRepository;
@@ -112,22 +113,26 @@ public class SearchServiceImpl implements SearchService {
         return pages;
     }
 
-    private List<Site> getSites(String site) {
+    private List<Site> getSites(String siteUrl) {
         List<Site> sites;
-        if (site == null || site.isBlank()) {
+        if (siteUrl == null || siteUrl.isBlank()) {
             sites = siteRepository.findAll();
         } else {
-            String trimSite = site.trim();
-            if (trimSite.matches("^https?://(?:www\\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\\b$")) {
-                Site persistSite = siteRepository.findByUrlIgnoreCase(trimSite)
-                        .orElseThrow(() -> new NotFoundException("Сайт не найден"));
-                sites = List.of(persistSite);
-            } else {
-                throw new BadRequestException("Некорректный адрес сайта");
-            }
+            Site site = getSite(siteUrl);
+            sites = List.of(site);
         }
         checkIndexed(sites);
         return sites;
+    }
+
+    private Site getSite(String siteUrl) {
+        String trimSiteUrl = siteUrl.trim();
+        if (trimSiteUrl.matches(URL_REGEX)) {
+            return siteRepository.findByUrlIgnoreCase(trimSiteUrl)
+                    .orElseThrow(() -> new NotFoundException("Сайт не найден"));
+        } else {
+            throw new BadRequestException("Некорректный адрес сайта");
+        }
     }
 
     private void checkIndexed(List<Site> sites) {
