@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 @Component
 public class LemmaParser {
 
-    public static final String REGEX_FOR_NORMALIZE = "[^А-Яа-я]";
+    private static final String REGEX_FOR_NORMALIZE = "[^А-Яа-я]";
     private static final Set<String> PARTICLES_NAMES = Set.of("МЕЖД", "ПРЕДЛ", "СОЮЗ", "МС");
     private final LuceneMorphology luceneMorph;
 

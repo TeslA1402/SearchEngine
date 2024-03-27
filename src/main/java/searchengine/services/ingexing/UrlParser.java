@@ -28,7 +28,7 @@ public class UrlParser extends RecursiveAction {
     private final transient SiteRepository siteRepository;
     private final transient PageRepository pageRepository;
     private final transient LemmaService lemmaService;
-    private final HtmlParser htmlParser;
+    private final transient HtmlParser htmlParser;
     private final boolean isFirstAction;
 
     @Override
@@ -59,7 +59,12 @@ public class UrlParser extends RecursiveAction {
                         indexed(siteId);
                     }
                 }
-            } catch (UnsupportedMimeTypeException ignore) {
+            } catch (UnsupportedMimeTypeException e) {
+                log.warn("UnsupportedMimeTypeException", e);
+            } catch (InterruptedException e){
+                log.warn("Interrupted!", e);
+                failed(siteId, "Ошибка парсинга: Interrupted");
+                Thread.currentThread().interrupt();
             } catch (Exception e) {
                 log.error("Parser exception", e);
                 failed(siteId, "Ошибка парсинга URL: " + getPersistSite(siteId).getUrl() + path);
